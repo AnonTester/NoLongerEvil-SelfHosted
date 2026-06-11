@@ -347,6 +347,42 @@ async def test_heartbeat_middleware_resolves_mac_to_real_serial(
 
 
 @pytest.mark.asyncio
+async def test_heartbeat_middleware_resolves_via_persisted_mapping_and_warms_cache(
+    state_service: DeviceStateService,
+    device_availability: DeviceAvailability,
+) -> None:
+    """On the first request after a restart, the in-memory mac_to_serial cache
+    is empty. The heartbeat middleware should fall back to the persisted
+    mac_alias mapping so the heartbeat isn't attributed to the MAC, and warm
+    the cache for subsequent requests."""
+    await state_service.upsert_object(
+        DeviceObject(
+            serial=f"mac_alias.{MAC_LOWER}",
+            object_key="mac_alias",
+            object_revision=1,
+            object_timestamp=int(time.time() * 1000),
+            value={"serial": REAL_SERIAL},
+            updated_at=datetime.now(),
+        )
+    )
+
+    middleware = create_device_heartbeat_middleware(device_availability)
+
+    mac_to_serial: dict[str, str] = {}
+    req = Mock(spec=web.Request)
+    req.headers = {"Authorization": _auth_header(MAC)}
+    req.app = {"mac_to_serial": mac_to_serial, "state_service": state_service}
+
+    handler = AsyncMock(return_value=web.Response(text="ok"))
+
+    await middleware(req, handler)
+
+    assert device_availability.get_last_seen(REAL_SERIAL) is not None
+    assert device_availability.get_last_seen(MAC) is None
+    assert mac_to_serial[MAC_LOWER] == REAL_SERIAL
+
+
+@pytest.mark.asyncio
 async def test_heartbeat_middleware_without_mapping_uses_request_serial(
     device_availability: DeviceAvailability,
 ) -> None:
