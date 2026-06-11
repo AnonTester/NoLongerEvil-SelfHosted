@@ -86,6 +86,33 @@ class TestDeviceStateService:
         assert "TEST87654321" in serials
 
     @pytest.mark.asyncio
+    async def test_get_all_serials_excludes_mac_alias_records(self, state_service: DeviceStateService):
+        """mac_alias.<mac> bookkeeping records aren't real devices."""
+        device_obj = DeviceObject(
+            serial="TEST12345678",
+            object_key="device.TEST12345678",
+            object_revision=1,
+            object_timestamp=1234567890,
+            value={"target_temperature": 21.0},
+            updated_at=datetime.now(),
+        )
+        alias_obj = DeviceObject(
+            serial="mac_alias.11b2334455d6",
+            object_key="mac_alias",
+            object_revision=1,
+            object_timestamp=1234567890,
+            value={"serial": "TEST12345678"},
+            updated_at=datetime.now(),
+        )
+
+        await state_service.upsert_object(device_obj)
+        await state_service.upsert_object(alias_obj)
+
+        serials = state_service.get_all_serials()
+
+        assert serials == ["TEST12345678"]
+
+    @pytest.mark.asyncio
     async def test_has_updates_since(self, state_service: DeviceStateService):
         """Test checking for updates since a revision."""
         obj = DeviceObject(

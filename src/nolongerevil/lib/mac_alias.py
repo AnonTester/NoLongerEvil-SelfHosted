@@ -14,6 +14,11 @@ from aiohttp import web
 
 _MAC_SERIAL_PATTERN = re.compile(r"^[0-9A-F]{12}$")
 
+# Prefix used for the persisted "mac_alias.<mac>" bookkeeping object's serial.
+# These records aren't real devices and must be excluded from
+# DeviceStateService.get_all_serials() (and anything that iterates it).
+MAC_ALIAS_SERIAL_PREFIX = "mac_alias."
+
 
 def looks_like_mac_serial(serial: str | None) -> bool:
     """Check whether `serial` looks like a 12-hex-digit MAC address."""
@@ -45,7 +50,7 @@ def resolve_mac_alias(request: web.Request, serial: str) -> tuple[str, str | Non
 
     state_service = request.app.get("state_service")
     if state_service:
-        mapping_obj = state_service.get_object(f"mac_alias.{mac_lower}", "mac_alias")
+        mapping_obj = state_service.get_object(f"{MAC_ALIAS_SERIAL_PREFIX}{mac_lower}", "mac_alias")
         if mapping_obj:
             resolved = mapping_obj.value.get("serial")
             if resolved:

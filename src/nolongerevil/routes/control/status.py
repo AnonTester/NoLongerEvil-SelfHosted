@@ -184,7 +184,7 @@ async def handle_devices(request: web.Request) -> web.Response:
         serials = await storage.get_all_registered_serials()
     else:
         # Open mode or storage unavailable — show all known devices
-        serials = [s for s in state_service.get_all_serials() if not s.startswith("mac_alias.")]
+        serials = state_service.get_all_serials()
 
     devices = []
     for serial in serials:

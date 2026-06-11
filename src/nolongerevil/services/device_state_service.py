@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from nolongerevil.lib.logger import get_logger
+from nolongerevil.lib.mac_alias import MAC_ALIAS_SERIAL_PREFIX
 from nolongerevil.lib.types import DeviceObject, DeviceStateChange
 
 if TYPE_CHECKING:
@@ -96,10 +97,13 @@ class DeviceStateService:
     def get_all_serials(self) -> list[str]:
         """Get all known device serials.
 
+        Excludes internal "mac_alias.<mac>" bookkeeping records, which aren't
+        real devices.
+
         Returns:
             List of device serial numbers
         """
-        return list(self._cache.keys())
+        return [s for s in self._cache.keys() if not s.startswith(MAC_ALIAS_SERIAL_PREFIX)]
 
     async def delete_device(self, serial: str) -> int:
         """Delete all objects for a device.

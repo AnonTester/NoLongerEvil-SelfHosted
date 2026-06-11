@@ -58,7 +58,7 @@ from aiohttp import web
 
 from nolongerevil.config.environment import settings
 from nolongerevil.lib.logger import get_logger
-from nolongerevil.lib.mac_alias import looks_like_mac_serial, resolve_mac_alias
+from nolongerevil.lib.mac_alias import MAC_ALIAS_SERIAL_PREFIX, looks_like_mac_serial, resolve_mac_alias
 from nolongerevil.lib.serial_parser import extract_serial_from_request, extract_serial_from_session, extract_weave_device_id
 from nolongerevil.lib.types import DeviceObject
 from nolongerevil.services.device_availability import DeviceAvailability
@@ -363,7 +363,7 @@ async def handle_transport_subscribe(request: web.Request) -> web.StreamResponse
             # Persist MAC->serial mapping so PUT handler survives restarts
             await state_service.upsert_object(
                 DeviceObject(
-                    serial=f"mac_alias.{mac_alias}",
+                    serial=f"{MAC_ALIAS_SERIAL_PREFIX}{mac_alias}",
                     object_key="mac_alias",
                     object_revision=1,
                     object_timestamp=int(time.time() * 1000),
