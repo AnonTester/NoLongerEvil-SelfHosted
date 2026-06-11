@@ -38,6 +38,11 @@ def create_device_heartbeat_middleware(
         serial = extract_serial_from_request(request)
 
         if serial:
+            # Resolve MAC-only devices to their real serial
+            mac_to_serial = request.app.get("mac_to_serial", {})
+            resolved = mac_to_serial.get(serial.lower())
+            if resolved:
+                serial = resolved
             await device_availability.mark_device_seen(serial)
 
         return await handler(request)

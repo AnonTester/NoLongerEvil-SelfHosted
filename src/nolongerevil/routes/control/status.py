@@ -36,8 +36,8 @@ def format_device_status(
     Returns:
         Device status dictionary
     """
-    device_obj = state_service.get_object(serial, f"device.{serial}")
-    shared_obj = state_service.get_object(serial, f"shared.{serial}")
+    device_obj = state_service.get_object(serial, f"device.{serial.lower()}")
+    shared_obj = state_service.get_object(serial, f"shared.{serial.lower()}")
 
     device_values = device_obj.value if device_obj else {}
     shared_values = shared_obj.value if shared_obj else {}
@@ -184,7 +184,7 @@ async def handle_devices(request: web.Request) -> web.Response:
         serials = await storage.get_all_registered_serials()
     else:
         # Open mode or storage unavailable — show all known devices
-        serials = state_service.get_all_serials()
+        serials = [s for s in state_service.get_all_serials() if not s.startswith("mac_alias.")]
 
     devices = []
     for serial in serials:
