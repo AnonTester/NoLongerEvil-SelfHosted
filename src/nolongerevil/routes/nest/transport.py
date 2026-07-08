@@ -58,8 +58,16 @@ from aiohttp import web
 
 from nolongerevil.config.environment import settings
 from nolongerevil.lib.logger import get_logger
-from nolongerevil.lib.mac_alias import MAC_ALIAS_SERIAL_PREFIX, looks_like_mac_serial, resolve_mac_alias
-from nolongerevil.lib.serial_parser import extract_serial_from_request, extract_serial_from_session, extract_weave_device_id
+from nolongerevil.lib.mac_alias import (
+    MAC_ALIAS_SERIAL_PREFIX,
+    looks_like_mac_serial,
+    resolve_mac_alias,
+)
+from nolongerevil.lib.serial_parser import (
+    extract_serial_from_request,
+    extract_serial_from_session,
+    extract_weave_device_id,
+)
 from nolongerevil.lib.types import DeviceObject
 from nolongerevil.services.device_availability import DeviceAvailability
 from nolongerevil.services.device_state_service import DeviceStateService
@@ -374,12 +382,14 @@ async def handle_transport_subscribe(request: web.Request) -> web.StreamResponse
             # Migrate any MAC-keyed objects to real serial
             mac_objects = state_service.get_objects_by_serial(mac_alias.upper())
             if mac_objects:
-                logger.debug(f"Migrating {len(mac_objects)} objects from {mac_alias.upper()} to {real_serial}")
+                logger.debug(
+                    f"Migrating {len(mac_objects)} objects from {mac_alias.upper()} to {real_serial}"
+                )
                 for mac_obj in mac_objects:
                     # Rewrite object_key if it contains the MAC
                     new_key = mac_obj.object_key
                     if new_key.endswith(mac_alias):
-                        new_key = new_key[:-len(mac_alias)] + real_serial.lower()
+                        new_key = new_key[: -len(mac_alias)] + real_serial.lower()
                     await state_service.upsert_object(
                         DeviceObject(
                             serial=real_serial,
@@ -424,7 +434,7 @@ async def handle_transport_subscribe(request: web.Request) -> web.StreamResponse
 
         # Rewrite MAC-based object keys to real serial-based keys
         if mac_alias and object_key.endswith(mac_alias):
-            object_key = object_key[:-len(mac_alias)] + serial.lower()
+            object_key = object_key[: -len(mac_alias)] + serial.lower()
             client_obj = {**client_obj, "object_key": object_key}  # rewrite in dict too
 
         processed_client_objects.append(client_obj)
@@ -892,7 +902,7 @@ async def handle_transport_put(request: web.Request) -> web.Response:
 
         # Rewrite MAC-based object keys to real serial-based keys
         if mac_alias and object_key and object_key.endswith(mac_alias):
-            object_key = object_key[:-len(mac_alias)] + serial.lower()
+            object_key = object_key[: -len(mac_alias)] + serial.lower()
 
         if not object_key or not value:
             logger.warning(f"No value provided for {serial}/{object_key}")

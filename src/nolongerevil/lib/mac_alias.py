@@ -22,7 +22,7 @@ MAC_ALIAS_SERIAL_PREFIX = "mac_alias."
 
 def looks_like_mac_serial(serial: str | None) -> bool:
     """Check whether `serial` looks like a 12-hex-digit MAC address."""
-    return bool(serial) and bool(_MAC_SERIAL_PATTERN.match(serial))
+    return serial is not None and bool(_MAC_SERIAL_PATTERN.match(serial))
 
 
 def resolve_mac_alias(request: web.Request, serial: str) -> tuple[str, str | None]:

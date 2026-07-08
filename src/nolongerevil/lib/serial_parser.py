@@ -160,7 +160,7 @@ def extract_serial_from_session(session_id: str, mac: str) -> str | None:
     if len(mac_clean) != 12:
         return None
     if session_id.lower().startswith(mac_clean):
-        return sanitize_serial(session_id[len(mac_clean):])
+        return sanitize_serial(session_id[len(mac_clean) :])
     return None
 
 

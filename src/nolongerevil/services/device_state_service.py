@@ -124,7 +124,7 @@ class DeviceStateService:
         Returns:
             List of device serial numbers
         """
-        return [s for s in self._cache.keys() if not s.startswith(MAC_ALIAS_SERIAL_PREFIX)]
+        return [s for s in self._cache if not s.startswith(MAC_ALIAS_SERIAL_PREFIX)]
 
     async def delete_device(self, serial: str) -> int:
         """Delete all objects for a device.

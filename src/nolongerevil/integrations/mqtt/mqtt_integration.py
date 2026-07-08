@@ -743,10 +743,10 @@ class MqttIntegration(BaseIntegration):
         if fan_timeout and isinstance(fan_timeout, (int, float)):
             now_seconds = int(time.time())
             if fan_timeout > now_seconds:
-                minutes_remaining = max(0, (fan_timeout - now_seconds) // 60)
+                fan_minutes_remaining = max(0, (fan_timeout - now_seconds) // 60)
                 await client.publish(
                     f"{prefix}/{serial}/ha/fan_timer_remaining",
-                    str(minutes_remaining),
+                    str(fan_minutes_remaining),
                     retain=True,
                 )
             else:
