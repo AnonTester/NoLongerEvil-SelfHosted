@@ -36,8 +36,12 @@ def format_device_status(
     Returns:
         Device status dictionary
     """
-    device_obj = state_service.get_object(serial, f"device.{serial.lower()}")
-    shared_obj = state_service.get_object(serial, f"shared.{serial.lower()}")
+    device_obj = state_service.get_object(
+        serial, f"device.{serial.lower()}"
+    ) or state_service.get_object_by_prefix(serial, "device.")
+    shared_obj = state_service.get_object(
+        serial, f"shared.{serial.lower()}"
+    ) or state_service.get_object_by_prefix(serial, "shared.")
 
     device_values = device_obj.value if device_obj else {}
     shared_values = shared_obj.value if shared_obj else {}
