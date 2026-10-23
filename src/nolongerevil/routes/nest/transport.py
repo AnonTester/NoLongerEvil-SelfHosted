@@ -61,6 +61,7 @@ from nolongerevil.lib.logger import get_logger
 from nolongerevil.lib.mac_alias import (
     MAC_ALIAS_SERIAL_PREFIX,
     looks_like_mac_serial,
+    objects_to_device_keys,
     resolve_mac_alias,
 )
 from nolongerevil.lib.serial_parser import (
@@ -713,7 +714,9 @@ async def handle_transport_subscribe(request: web.Request) -> web.StreamResponse
     if not chunked:
         # Non-chunked mode - respond immediately (7s timeout on device side)
         if outdated_objects:
-            formatted_objs = [format_object_for_response(obj) for obj in outdated_objects]
+            formatted_objs = objects_to_device_keys(
+                [format_object_for_response(obj) for obj in outdated_objects], mac_alias
+            )
             return web.json_response(
                 {"objects": formatted_objs},
                 headers=_make_response_headers(),
@@ -762,7 +765,9 @@ async def handle_transport_subscribe(request: web.Request) -> web.StreamResponse
 
     # If we have outdated objects, send them immediately
     if outdated_objects:
-        formatted_objs = [format_object_for_response(obj) for obj in outdated_objects]
+        formatted_objs = objects_to_device_keys(
+            [format_object_for_response(obj) for obj in outdated_objects], mac_alias
+        )
         logger.debug(f"Sending {len(outdated_objects)} outdated object(s) immediately for {serial}")
         body_data = json.dumps({"objects": formatted_objs}).encode("utf-8")
         await response.write(body_data)
@@ -799,7 +804,9 @@ async def handle_transport_subscribe(request: web.Request) -> web.StreamResponse
                 timeout=settings.connection_hold_timeout,
             )
             # Real data arrived - send it to wake the device
-            body_bytes = json.dumps({"objects": changed_objects}).encode("utf-8")
+            body_bytes = json.dumps(
+                {"objects": objects_to_device_keys(changed_objects, mac_alias)}
+            ).encode("utf-8")
             await response.write(body_bytes)
             data_sent = True
             total_bytes = len(body_bytes)
@@ -815,7 +822,9 @@ async def handle_transport_subscribe(request: web.Request) -> web.StreamResponse
                         notify_queue.get(),
                         timeout=INTER_CHUNK_BATCH_TIMEOUT,
                     )
-                    body_bytes = json.dumps({"objects": changed_objects}).encode("utf-8")
+                    body_bytes = json.dumps(
+                        {"objects": objects_to_device_keys(changed_objects, mac_alias)}
+                    ).encode("utf-8")
                     await response.write(body_bytes)
                     total_bytes += len(body_bytes)
                     chunk_count += 1
@@ -1018,7 +1027,7 @@ async def handle_transport_put(request: web.Request) -> web.Response:
     # which is the correct mechanism.  Removed 2026-02-09.
 
     return web.json_response(
-        {"objects": response_objects},
+        {"objects": objects_to_device_keys(response_objects, mac_alias)},
         headers=_make_response_headers(),
     )
 

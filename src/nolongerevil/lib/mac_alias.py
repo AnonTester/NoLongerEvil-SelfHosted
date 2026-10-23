@@ -9,6 +9,7 @@ survives restarts.
 """
 
 import re
+from typing import Any
 
 from aiohttp import web
 
@@ -58,3 +59,35 @@ def resolve_mac_alias(request: web.Request, serial: str) -> tuple[str, str | Non
                 return resolved, mac_lower
 
     return serial, None
+
+
+# Buckets a MAC-only device addresses by its MAC rather than by its serial
+# (e.g. "shared.<mac>"). Other buckets (device., schedule.) use the serial.
+MAC_KEYED_BUCKET_PREFIXES = ("shared.",)
+
+
+def to_device_object_key(object_key: str, mac_alias: str | None) -> str:
+    """Translate a server-side object_key to the key the device itself uses.
+
+    Inverse of the inbound "<mac> -> <serial>" rewrite. A MAC-only device only
+    recognises its shared bucket as "shared.<mac>"; objects sent as
+    "shared.<serial>" are ignored, so target temperature changes never apply.
+    """
+    if mac_alias and object_key.startswith(MAC_KEYED_BUCKET_PREFIXES):
+        bucket = object_key.split(".", 1)[0]
+        return f"{bucket}.{mac_alias}"
+    return object_key
+
+
+def objects_to_device_keys(
+    objects: list[dict[str, Any]], mac_alias: str | None
+) -> list[dict[str, Any]]:
+    """Return formatted object dicts with object_keys translated for the device."""
+    if not mac_alias:
+        return objects
+    return [
+        {**obj, "object_key": to_device_object_key(obj["object_key"], mac_alias)}
+        if "object_key" in obj
+        else obj
+        for obj in objects
+    ]

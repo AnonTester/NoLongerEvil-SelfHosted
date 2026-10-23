@@ -17,6 +17,7 @@ import pytest
 from aiohttp import web
 
 from nolongerevil.config.environment import settings
+from nolongerevil.lib.mac_alias import objects_to_device_keys, to_device_object_key
 from nolongerevil.lib.types import DeviceObject, DeviceOwner
 from nolongerevil.middleware.device_auth import (
     TIER_PAIRED,
@@ -319,6 +320,113 @@ async def test_put_without_mapping_uses_mac_as_serial(
     stored = state_service.get_object(MAC, f"device.{MAC_LOWER}")
     assert stored is not None
     assert stored.value == {"current_humidity": 40}
+
+
+# ---------------------------------------------------------------------------
+# Outbound: the shared bucket is addressed by MAC, other buckets by serial
+# ---------------------------------------------------------------------------
+
+
+def test_to_device_object_key_maps_shared_bucket_to_mac() -> None:
+    """The device only recognises its shared bucket as shared.<mac>."""
+    assert to_device_object_key(f"shared.{REAL_SERIAL_LOWER}", MAC_LOWER) == f"shared.{MAC_LOWER}"
+    assert to_device_object_key(f"shared.{REAL_SERIAL}", MAC_LOWER) == f"shared.{MAC_LOWER}"
+
+
+def test_to_device_object_key_leaves_other_buckets_alone() -> None:
+    for key in (
+        f"device.{REAL_SERIAL_LOWER}",
+        f"schedule.{REAL_SERIAL_LOWER}",
+        "structure.default",
+        "user.1234",
+    ):
+        assert to_device_object_key(key, MAC_LOWER) == key
+
+
+def test_to_device_object_key_without_alias_is_noop() -> None:
+    key = f"shared.{REAL_SERIAL_LOWER}"
+    assert to_device_object_key(key, None) == key
+
+
+def test_objects_to_device_keys_does_not_mutate_input() -> None:
+    objects = [
+        {"object_key": f"shared.{REAL_SERIAL_LOWER}", "value": {"target_temperature": 21.5}},
+        {"object_key": f"device.{REAL_SERIAL_LOWER}", "value": {}},
+    ]
+    translated = objects_to_device_keys(objects, MAC_LOWER)
+
+    assert [o["object_key"] for o in translated] == [
+        f"shared.{MAC_LOWER}",
+        f"device.{REAL_SERIAL_LOWER}",
+    ]
+    assert translated[0]["value"] == {"target_temperature": 21.5}
+    assert objects[0]["object_key"] == f"shared.{REAL_SERIAL_LOWER}"
+    assert objects_to_device_keys(objects, None) is objects
+
+
+@pytest.mark.asyncio
+async def test_subscribe_replies_with_shared_bucket_keyed_by_mac(
+    state_service: DeviceStateService,
+    subscription_manager: SubscriptionManager,
+) -> None:
+    """A device subscribing to shared.<mac> must get the bucket back under that
+    same key, otherwise it never tracks the bucket and ignores later pushes."""
+    await state_service.upsert_object(
+        DeviceObject(
+            serial=REAL_SERIAL,
+            object_key=f"shared.{REAL_SERIAL_LOWER}",
+            object_revision=7,
+            object_timestamp=2000,
+            value={"target_temperature": 21.5},
+            updated_at=datetime.now(),
+        )
+    )
+
+    body = await _subscribe(
+        state_service,
+        subscription_manager,
+        {},
+        {
+            "chunked": False,
+            "session": MAC_LOWER + REAL_SERIAL,
+            "objects": [
+                {"object_key": f"shared.{MAC_LOWER}", "object_revision": 0, "object_timestamp": 0}
+            ],
+        },
+    )
+
+    assert [o["object_key"] for o in body["objects"]] == [f"shared.{MAC_LOWER}"]
+    assert body["objects"][0]["object_revision"] == 7
+    assert body["objects"][0]["value"] == {"target_temperature": 21.5}
+
+    # Server-side storage stays keyed by the real serial
+    assert state_service.get_object(REAL_SERIAL, f"shared.{REAL_SERIAL_LOWER}") is not None
+
+
+@pytest.mark.asyncio
+async def test_put_ack_for_shared_bucket_is_keyed_by_mac(
+    state_service: DeviceStateService,
+) -> None:
+    """The PUT acknowledgement carries the revision back under the key the
+    device sent, so the device can record it instead of staying at revision 0."""
+    mac_to_serial = {MAC_LOWER: REAL_SERIAL}
+
+    body = await _put(
+        state_service,
+        mac_to_serial,
+        [
+            {"object_key": f"shared.{MAC_LOWER}", "value": {"current_temperature": 21.0}},
+            {"object_key": f"device.{REAL_SERIAL_LOWER}", "value": {"current_humidity": 50}},
+        ],
+    )
+
+    keys = [o["object_key"] for o in body["objects"]]
+    assert keys == [f"shared.{MAC_LOWER}", f"device.{REAL_SERIAL_LOWER}"]
+
+    stored = state_service.get_object(REAL_SERIAL, f"shared.{REAL_SERIAL_LOWER}")
+    assert stored is not None
+    assert stored.value == {"current_temperature": 21.0}
+    assert body["objects"][0]["object_revision"] == stored.object_revision
 
 
 # ---------------------------------------------------------------------------
